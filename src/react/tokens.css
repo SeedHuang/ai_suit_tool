@@ -1,0 +1,46 @@
+/* AI 套件默认令牌 —— 消费方可覆盖 */
+:root {
+  --ai-accent: #1677ff;
+  --ai-text-dim: rgba(0, 0, 0, 0.45);
+  --ai-warn: #faad14;
+  --ai-ok: #52c41a;
+  --ai-rule: rgba(0, 0, 0, 0.06);
+  --ai-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* ============================================================
+   三卡用到的三个基础 class 的**默认样式**壳。
+   Card / Field / EntryCard / PurposeCard 只写了这些类名，不自带样式，
+   纯前端消费方（自己没定义这三个类时）靠这份默认值至少能看出
+   「卡片 / 标签 / 等宽数字」的基本观感。
+
+   两条规矩：
+   1. 一律用 `:where()` 包住 —— 它是**零优先级**的，消费方写一条普通的
+      `.hud-panel { ... }` 就必然覆盖（连 `@import` 顺序都不用管）。
+      BFM 就自带一套 CP2077 的 .hud-panel/.hud-label/.num，不受这里影响。
+   2. 只依赖上面的 `--ai-*` 变量，不引入新的视觉体系。
+   ============================================================ */
+
+/* 卡片外壳：细描边 + 极淡底，能读出"这是一块面板" */
+:where(.hud-panel) {
+  position: relative;
+  background: rgba(127, 127, 127, 0.04);
+  border: 1px solid var(--ai-rule);
+  border-radius: 2px;
+}
+
+/* 小标签：等宽 + 字距 + 弱化色 */
+:where(.hud-label) {
+  font-family: var(--ai-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--ai-text-dim);
+  text-transform: uppercase;
+}
+
+/* 数字：等宽 + 表格数字，上下行对齐 */
+:where(.num) {
+  font-family: var(--ai-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+

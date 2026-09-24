@@ -24,6 +24,7 @@
     "test": "vitest run --configLoader=runner",
     "test:watch": "vitest --configLoader=runner",
     "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build",
     "publish:public": "npm publish --access public"
   },
   "dependencies": {

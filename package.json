@@ -1,6 +1,6 @@
 {
   "name": "@seedhuang/ai_suit_tool",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "AI 配置与请求公共套件：三层模型配置 + 唯一请求出口 + 设置 UI，前后端可合可拆",
   "main": "./dist/index.js",
@@ -41,7 +41,9 @@
     "build:watch": "tsc -p tsconfig.build.json --watch",
     "test": "vitest run --configLoader=runner",
     "test:watch": "vitest --configLoader=runner",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build",
+    "publish:public": "pnpm publish --access public"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^3.0.44",

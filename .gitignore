@@ -1,6 +1,2 @@
 node_modules/
 dist/
-# 之前任务的 git plumbing 探查残留（含 .git，无法安全删除）
-freshobj/
-git-store/
-sandbox-probe/

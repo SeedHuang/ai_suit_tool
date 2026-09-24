@@ -1,6 +1,6 @@
 {
   "name": "@seedhuang/ai_suit_tool",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "description": "AI 配置与请求公共套件：三层模型配置 + 唯一请求出口 + 设置 UI，前后端可合可拆",
   "main": "./dist/index.js",

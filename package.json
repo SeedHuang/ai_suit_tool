@@ -23,7 +23,8 @@
     "build:watch": "tsc -p tsconfig.build.json --watch",
     "test": "vitest run --configLoader=runner",
     "test:watch": "vitest --configLoader=runner",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "publish:public": "npm publish --access public"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^3.0.44",

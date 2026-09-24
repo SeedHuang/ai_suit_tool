@@ -6,26 +6,42 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".":            { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./core":       { "types": "./dist/core/index.d.ts", "default": "./dist/core/index.js" },
-    "./fastify":    { "types": "./dist/fastify/index.d.ts", "default": "./dist/fastify/index.js" },
-    "./react":      { "types": "./dist/react/index.d.ts", "default": "./dist/react/index.js" },
-    "./contract":   { "types": "./dist/contract/index.d.ts", "default": "./dist/contract/index.js" },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "default": "./dist/core/index.js"
+    },
+    "./fastify": {
+      "types": "./dist/fastify/index.d.ts",
+      "default": "./dist/fastify/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "default": "./dist/react/index.js"
+    },
+    "./contract": {
+      "types": "./dist/contract/index.d.ts",
+      "default": "./dist/contract/index.js"
+    },
     "./contract-tests": {
       "types": "./dist/contract/runContractTests.d.ts",
       "default": "./dist/contract/runContractTests.js"
     },
     "./tokens.css": "./src/react/tokens.css"
   },
-  "files": ["dist", "src/react/tokens.css"],
+  "files": [
+    "dist",
+    "src/react/tokens.css"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "build:watch": "tsc -p tsconfig.build.json --watch",
     "test": "vitest run --configLoader=runner",
     "test:watch": "vitest --configLoader=runner",
-    "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build",
-    "publish:public": "npm publish --access public"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^3.0.44",
@@ -33,10 +49,10 @@
     "ai": "^7.0.101"
   },
   "peerDependencies": {
-    "react": ">=18",
-    "react-dom": ">=18",
+    "@ant-design/icons": ">=5",
     "antd": ">=5",
-    "@ant-design/icons": ">=5"
+    "react": ">=18",
+    "react-dom": ">=18"
   },
   "devDependencies": {
     "@types/node": "^22.20.2",
@@ -48,6 +64,6 @@
     "react-dom": "^18.3.1",
     "tsx": "^4.23.13",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.7"
+    "vitest": "^4.1.11"
   }
 }

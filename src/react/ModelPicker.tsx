@@ -51,6 +51,46 @@ export async function fetchModels(
 }
 
 /**
+ * 拉模型列表的公共骨架(卡 1/卡 2 共用),配一个 `useRef(0)` 的请求序号用。
+ *
+ * **只认最后一次请求的结果** —— 快速切凭证/改地址时,先发后到的旧响应被序号守卫
+ * 直接丢弃:不丢弃的话,下拉里显示的模型名看着像当前这条凭证拉回来的,用户照着
+ * 建条目会得到张冠李戴的模型名(卡 2 还会把 A 厂商的模型名加到 B 厂商的条目下,
+ * 因为 addEntry 只传 providerId + model)。
+ *
+ * busy 取值约定:`'' | 'models'` —— 各卡的 busy 是并集('add'/'save'/'test' 留在各卡),
+ * 所以 setBusy 由调用方传入,这里只动 models 相关的三个状态。
+ */
+export async function loadModelList(
+  seqRef: { current: number },
+  run: () => Promise<{ models: ModelMeta[]; note: string }>,
+  h: {
+    setModels: (m: ModelMeta[]) => void;
+    setModelsNote: (n: string) => void;
+    setError: (m: string) => void;
+    setBusy: (b: '' | 'models') => void;
+  },
+): Promise<void> {
+  const seq = ++seqRef.current;
+  h.setError('');
+  h.setModelsNote('');
+  h.setBusy('models');
+  try {
+    const r = await run();
+    // 过期响应直接丢弃(不 setState)—— 只有最后一次请求的结果能落到界面上
+    if (seq !== seqRef.current) return;
+    h.setModels(r.models);
+    h.setModelsNote(r.note);
+  } catch (e) {
+    if (seq !== seqRef.current) return;
+    h.setModels([]);
+    h.setError((e as Error).message);
+  } finally {
+    if (seq === seqRef.current) h.setBusy('');
+  }
+}
+
+/**
  * 模型名下拉 + 刷新。**tags 模式是为了能自由输入模型名。** 厂商拉不到时(还没填 key)
  * 下拉可能只有内置那几个,「自定义」端点更是一个都没有 —— 而"想用的模型不在表里"是
  * 最正常不过的事。maxCount=1 让它在语义上仍然是单选,value/onChange 在这里做

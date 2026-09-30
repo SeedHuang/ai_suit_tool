@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Input, Select } from 'antd';
 import { KeyOutlined, SaveOutlined } from '@ant-design/icons';
-import { useAiClient, useAiReload, useAiVersion } from './index.js';
 import type { ModelMeta, ProviderView } from '../contract/types.js';
 import { Card } from './Card.js';
 import { Field } from './Field.js';
-import { fetchModels, ModelPicker, ModelsNote } from './ModelPicker.js';
-import { useCardFeedback } from './useCardFeedback.js';
+import { fetchModels, loadModelList, ModelPicker, ModelsNote } from './ModelPicker.js';
+import { fetchWithAlive, removeCardItem, useAiCard } from './cardBase.js';
 
 const PROVIDERS = [
   { value: 'ollama', label: '本地 Ollama', hint: '隐私 / 离线主力,默认 qwen2.5:14b' },
@@ -26,11 +25,7 @@ function apiKeyPlaceholder(editingHasKey: boolean, provider: string): string {
 // ── 卡 1:服务商凭证 ─────────────────────────────────────
 
 export function ProviderCard() {
-  const client = useAiClient();
-  const reload = useAiReload();
-  /** reload 递增的刷新版本号 —— 加进拉数据 effect 的依赖里重拉,而不是靠重挂载子树 */
-  const version = useAiVersion();
-  const { error, setError, setNotice, clear, alerts } = useCardFeedback();
+  const { client, reload, version, error, setError, setNotice, clear, alerts } = useAiCard();
   const [providers, setProviders] = useState<ProviderView[]>([]);
   const [provider, setProvider] = useState('ollama');
   const [baseUrl, setBaseUrl] = useState('');
@@ -44,9 +39,7 @@ export function ProviderCard() {
    *  重拉只由「切换服务商」和点「刷新」按钮显式触发。 */
   const baseUrlRef = useRef('');
   const apiKeyRef = useRef('');
-  /** 模型列表请求序号 —— 只认最后一次请求的结果。先发后到的旧响应(快速改地址 / 快速切
-   *  服务商)直接丢弃,否则下拉里显示的模型名看着像当前这条凭证拉回来的,用户照着建条目
-   *  会得到张冠李戴的模型名。 */
+  /** 模型列表请求序号 —— 只认最后一次请求的结果(为什么,见 loadModelList) */
   const modelsSeqRef = useRef(0);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -67,46 +60,17 @@ export function ProviderCard() {
     apiKeyRef.current = apiKey;
   }, [apiKey]);
 
-  useEffect(() => {
-    let alive = true;
-    // 重拉前先清掉上一次的失败 —— 否则拉成功之后那句错误还挂在界面上
-    setError('');
-    client
-      .providers()
-      .then((p) => {
-        if (alive) setProviders(p);
-      })
-      .catch((e) => {
-        // 不能吞:列表保持 [] 时界面上是「还没有凭证 —— 在下面建一条」,和「确实一条
-        // 都没配」长得一模一样,用户会以为配置丢了并去重建
-        if (alive) setError((e as Error).message);
-      });
-    return () => {
-      alive = false;
-    };
+  useEffect(
+    () => fetchWithAlive(setError, () => client.providers(), setProviders),
     // version:保存/删除凭证后要重拉这张列表(以前靠 key 重挂载,现在靠版本号)
-  }, [client, version, setError]);
+    [client, version, setError],
+  );
 
   const loadModels = useCallback(
-    async (p: string) => {
-      const seq = ++modelsSeqRef.current;
-      setError('');
-      setModelsNote('');
-      setBusy('models');
-      try {
-        const r = await fetchModels(client, p, baseUrlRef.current, apiKeyRef.current);
-        // 过期响应直接丢弃(不 setState)—— 只有最后一次请求的结果能落到界面上
-        if (seq !== modelsSeqRef.current) return;
-        setModels(r.models);
-        setModelsNote(r.note);
-      } catch (e) {
-        if (seq !== modelsSeqRef.current) return;
-        setModels([]);
-        setError((e as Error).message);
-      } finally {
-        if (seq === modelsSeqRef.current) setBusy('');
-      }
-    },
+    async (p: string) =>
+      loadModelList(modelsSeqRef, () => fetchModels(client, p, baseUrlRef.current, apiKeyRef.current), {
+        setModels, setModelsNote, setError, setBusy,
+      }),
     // 同 fetchModels:baseUrl / apiKey 故意不在这里 —— 靠 ref.current 取最新值,所以这份
     // 缓存不会因为用户改地址、改 Key 而重建(否则每敲一个字符就重拉一次上游)
     [client, setError],
@@ -193,17 +157,14 @@ export function ProviderCard() {
     }
   };
 
-  const remove = async (id: string) => {
-    clear();
-    try {
-      await client.deleteProvider(id);
-      if (editingId === id) cancelEdit();
-      await reload();
-    } catch (e) {
-      // 400 的 reason 原样展示 —— "这条凭证还有模型条目在用"正是要让用户看到的
-      setError((e as Error).message);
-    }
-  };
+  const remove = (id: string) =>
+    removeCardItem(() => client.deleteProvider(id), {
+      clear, reload, setError,
+      onDeleted: () => {
+        // 删的是正在编辑的那条 → 退出编辑态,否则表单停在一个已不存在的凭证上
+        if (editingId === id) cancelEdit();
+      },
+    });
 
   const test = async () => {
     clear();

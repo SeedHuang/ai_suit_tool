@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { AiCore } from '../core/index.js';
 import type { AiLogger } from '../core/index.js';
 import type { ModelMeta } from '../contract/types.js';
@@ -74,6 +74,19 @@ function entryMeta(
   return real ? { ...base, ...real, verified: true } : base;
 }
 
+/**
+ * 写路由的统一出口:动作成功原样返回它的结果,抛错转 400 { ok:false, reason }。
+ * reason 是服务端抛错的人话文案,直接给用户 —— 五个写路由共用这一条出口,
+ * 免得同一套 try/catch 抄五份,修一处漏四处。
+ */
+async function or400<T>(reply: FastifyReply, run: () => T | Promise<T>): Promise<T | FastifyReply> {
+  try {
+    return await run();
+  } catch (e) {
+    return reply.code(400).send({ ok: false, reason: (e as Error).message });
+  }
+}
+
 export function registerAiSettings(app: FastifyInstance, opts: AiSettingsPluginOptions): void {
   const { ai } = opts;
   const logger = opts.logger ?? consoleLogger;
@@ -134,23 +147,19 @@ export function registerAiSettings(app: FastifyInstance, opts: AiSettingsPluginO
 
   app.put('/api/settings/providers', async (req, reply) => {
     const body = (req.body ?? {}) as { id?: string; provider: string; baseUrl?: string; apiKey?: string };
-    try {
+    return or400(reply, async () => {
       const p = ai.saveProvider(body);
       logger.event({ level: 'info', category: 'llm', message: `服务商凭证已保存:${p.provider}` });
       return { ok: true, id: p.id };
-    } catch (e) {
-      return reply.code(400).send({ ok: false, reason: (e as Error).message });
-    }
+    });
   });
 
-  app.delete('/api/settings/providers/:id', async (req, reply) => {
-    try {
+  app.delete('/api/settings/providers/:id', async (req, reply) =>
+    or400(reply, () => {
       ai.deleteProvider((req.params as { id: string }).id);
       return { ok: true };
-    } catch (e) {
-      return reply.code(400).send({ ok: false, reason: (e as Error).message });
-    }
-  });
+    }),
+  );
 
   app.get('/api/settings/entries', async () => {
     const providers = ai.listProviders();
@@ -172,36 +181,30 @@ export function registerAiSettings(app: FastifyInstance, opts: AiSettingsPluginO
 
   app.post('/api/settings/entries', async (req, reply) => {
     const body = (req.body ?? {}) as { providerId?: string; model?: string };
-    try {
+    return or400(reply, async () => {
       const e = ai.addEntry({ providerId: body.providerId ?? '', model: body.model ?? '' });
       logger.event({ level: 'info', category: 'llm', message: `模型条目已添加:${e.model}` });
       return { ok: true, id: e.id };
-    } catch (e) {
-      return reply.code(400).send({ ok: false, reason: (e as Error).message });
-    }
+    });
   });
 
-  app.delete('/api/settings/entries/:id', async (req, reply) => {
-    try {
+  app.delete('/api/settings/entries/:id', async (req, reply) =>
+    or400(reply, () => {
       ai.deleteEntry((req.params as { id: string }).id);
       return { ok: true };
-    } catch (e) {
-      return reply.code(400).send({ ok: false, reason: (e as Error).message });
-    }
-  });
+    }),
+  );
 
   app.get('/api/settings/assignments', async () => ({ assignments: ai.getAssignments() }));
 
   app.put('/api/settings/assignments', async (req, reply) => {
     const body = (req.body ?? {}) as Record<string, string | null>;
-    try {
+    return or400(reply, async () => {
       for (const purpose of Object.keys(ai.getAssignments())) {
         if (body[purpose] !== undefined) ai.setAssignment(purpose, body[purpose]);
       }
       return { ok: true };
-    } catch (e) {
-      return reply.code(400).send({ ok: false, reason: (e as Error).message });
-    }
+    });
   });
 
   app.post('/api/settings/test-llm', async (req, reply) => {

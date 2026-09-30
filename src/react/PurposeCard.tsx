@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Button, Select } from 'antd';
 import { SlidersOutlined } from '@ant-design/icons';
-import { useAiClient, useAiReload, useAiVersion } from './index.js';
 import type { EntryView } from '../contract/types.js';
 import { Card } from './Card.js';
 import { Field, fieldId } from './Field.js';
-import { useCardFeedback } from './useCardFeedback.js';
+import { fetchWithAlive, useAiCard } from './cardBase.js';
 
 // ── 卡 3:用途分配(模型分配列,轮询/批次留在消费方)──────
 
@@ -18,37 +17,25 @@ const PURPOSE_LABELS: Record<string, string> = {
 };
 
 export function PurposeCard() {
-  const client = useAiClient();
-  const reload = useAiReload();
-  /** reload 递增的刷新版本号 —— 加进拉数据 effect 的依赖里重拉,而不是靠重挂载子树 */
-  const version = useAiVersion();
-  const { error, setError, clear, alerts } = useCardFeedback();
+  const { client, reload, version, error, setError, clear, alerts } = useAiCard();
   const [entries, setEntries] = useState<EntryView[]>([]);
   const [assignments, setAssignments] = useState<Record<string, string | null> | null>(null);
   /** 变更进行中锁住全部下拉 —— 快速连改两次时旧响应会晚到,把界面刷回旧值 */
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    // 重试前先清掉上一次的失败 —— 否则拉成功之后那句错误还挂在界面上
-    setError('');
-    Promise.all([client.entries(), client.assignments()])
-      .then(([e, a]) => {
-        if (alive) {
+  useEffect(
+    () =>
+      fetchWithAlive(
+        setError,
+        () => Promise.all([client.entries(), client.assignments()]),
+        ([e, a]) => {
           setEntries(e);
           setAssignments(a);
-        }
-      })
-      .catch((e) => {
-        // 不能吞:assignments 停在 null 就永远是「加载中…」—— 既不报错也没有重试入口,
-        // 用户只能刷新页面。失败要落到 error 上,和「正在加载」分得开
-        if (alive) setError((e as Error).message);
-      });
-    return () => {
-      alive = false;
-    };
+        },
+      ),
     // version:改了用途分配后重拉服务端的真值(以前靠 key 重挂载,现在靠版本号)
-  }, [client, version, setError]);
+    [client, version, setError],
+  );
 
   if (assignments === null) {
     return (

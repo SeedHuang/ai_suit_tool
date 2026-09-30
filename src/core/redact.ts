@@ -4,8 +4,8 @@
  * 这个文件刻意不 import 任何东西,方便单测,也避免它被别处的依赖污染。
  */
 
-/** 需要抹掉值的键名(小写比较) */
-export const SENSITIVE_KEYS: readonly string[] = [
+/** 需要抹掉值的键名(小写比较)。只在 redactDeep 的键名规则里消费,不外发 */
+const SENSITIVE_KEYS: readonly string[] = [
   'sessdata',
   'bili_jct',
   'api_key',

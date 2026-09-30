@@ -13,14 +13,6 @@ export type { ModelMeta };
  * `verified:false` 的一律在 UI 标 ⚠️ 待确认 —— 数字不准只会让批次变小,不会出错,
  * 但用户得知道这个数不是实测来的。
  */
-export type ModelProvider =
-  | 'ollama'
-  | 'ark'
-  | 'deepseek'
-  | 'minimax'
-  | 'anthropic-compatible'
-  | 'custom';
-
 /** 未收录模型的兜底 —— 保守到任何模型都能跑,代价只是批次小 */
 const FALLBACK: Omit<ModelMeta, 'provider' | 'model'> = {
   contextWindow: 32_768,

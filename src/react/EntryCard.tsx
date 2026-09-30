@@ -1,21 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Select } from 'antd';
 import { ThunderboltOutlined } from '@ant-design/icons';
-import { useAiClient, useAiReload, useAiVersion } from './index.js';
 import type { EntryView, ModelMeta, ProviderView } from '../contract/types.js';
 import { Card } from './Card.js';
 import { Field } from './Field.js';
-import { fetchModels, ModelPicker, ModelsNote } from './ModelPicker.js';
-import { useCardFeedback } from './useCardFeedback.js';
+import { fetchModels, loadModelList, ModelPicker, ModelsNote } from './ModelPicker.js';
+import { fetchWithAlive, removeCardItem, useAiCard } from './cardBase.js';
 
 // ── 卡 2:模型条目 ───────────────────────────────────────
 
 export function EntryCard() {
-  const client = useAiClient();
-  const reload = useAiReload();
-  /** reload 递增的刷新版本号 —— 加进拉数据 effect 的依赖里重拉,而不是靠重挂载子树 */
-  const version = useAiVersion();
-  const { error, setError, setNotice, clear, alerts } = useCardFeedback();
+  const { client, reload, version, error, setError, setNotice, clear, alerts } = useAiCard();
   const [providers, setProviders] = useState<ProviderView[]>([]);
   const [entries, setEntries] = useState<EntryView[]>([]);
   const [providerId, setProviderId] = useState('');
@@ -23,61 +18,39 @@ export function EntryCard() {
   const [models, setModels] = useState<ModelMeta[]>([]);
   const [modelsNote, setModelsNote] = useState('');
   const [busy, setBusy] = useState<'' | 'models' | 'add'>('');
-  /** 模型列表请求序号 —— 只认最后一次请求的结果。快速在两条凭证之间切换时,上一个
-   *  provider 的响应可能后到并覆盖当前列表;而 addEntry 只传 providerId + model,
-   *  于是会把 A 厂商的模型名加到 B 厂商的条目下。非最新请求直接丢弃。 */
+  /** 模型列表请求序号 —— 只认最后一次请求的结果(为什么,见 loadModelList) */
   const modelsSeqRef = useRef(0);
 
-  useEffect(() => {
-    let alive = true;
-    // 重拉前先清掉上一次的失败 —— 否则拉成功之后那句错误还挂在界面上
-    setError('');
-    Promise.all([client.providers(), client.entries()])
-      .then(([p, e]) => {
-        if (alive) {
+  useEffect(
+    () =>
+      fetchWithAlive(
+        setError,
+        () => Promise.all([client.providers(), client.entries()]),
+        ([p, e]) => {
           setProviders(p);
           setEntries(e);
-        }
-      })
-      .catch((e) => {
-        // 不能吞:列表保持 [] 时界面上是「还没有模型条目。」,和「确实一条都没建」
-        // 长得一模一样,用户会以为条目丢了并去重建
-        if (alive) setError((e as Error).message);
-      });
-    return () => {
-      alive = false;
-    };
+        },
+      ),
     // version:添加/删除条目后要重拉这两张列表(以前靠 key 重挂载,现在靠版本号)
-  }, [client, version, setError]);
+    [client, version, setError],
+  );
 
   const selected = providers.find((p) => p.id === providerId);
 
   const loadModels = useCallback(async () => {
-    const seq = ++modelsSeqRef.current;
     if (!selected) {
       // 上面已自增序号作废在途请求,它的 finally 会被序号守卫跳过 —— 这里不兜底清 busy
       // 的话,busy 会永久停在 'models',「刷新」按钮一直转(选中凭证被删时走到这里)
+      ++modelsSeqRef.current;
       setModels([]);
       setModelsNote('');
       setBusy('');
       return;
     }
-    setError('');
-    setModelsNote('');
-    setBusy('models');
-    try {
-      // apiKey 传空 = 用这条凭证已存的 key(表单里从来拿不到明文)
-      const r = await fetchModels(client, selected.provider, selected.baseUrl, '');
-      if (seq !== modelsSeqRef.current) return;
-      setModels(r.models);
-      setModelsNote(r.note);
-    } catch (e) {
-      if (seq !== modelsSeqRef.current) return;
-      setModels([]);
-      setError((e as Error).message);
-    } finally {
-      if (seq === modelsSeqRef.current) setBusy('');
-    }
+    // apiKey 传空 = 用这条凭证已存的 key(表单里从来拿不到明文)
+    await loadModelList(modelsSeqRef, () => fetchModels(client, selected.provider, selected.baseUrl, ''), {
+      setModels, setModelsNote, setError, setBusy,
+    });
   }, [selected, client, setError]);
 
   useEffect(() => {
@@ -100,16 +73,8 @@ export function EntryCard() {
     }
   };
 
-  const remove = async (id: string) => {
-    clear();
-    try {
-      await client.deleteEntry(id);
-      await reload();
-    } catch (e) {
-      // 400 原样:"这个条目正被用途引用(...)—— 先在「用途分配」里改指别的条目"
-      setError((e as Error).message);
-    }
-  };
+  const remove = (id: string) =>
+    removeCardItem(() => client.deleteEntry(id), { clear, reload, setError });
 
   // 表里查得到就看它自己的 verified;查不到(手打的名字,或从厂商拉来但注册表没收录)
   // **就是未确认** —— 服务端给的那两个数字是兜底值,必须让用户核对:
